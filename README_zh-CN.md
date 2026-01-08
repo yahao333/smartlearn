@@ -1,8 +1,7 @@
-# 运行并部署你的 AI Studio 应用
+# 运行并部署你的应用
 
 本项目包含了在本地运行应用所需的一切配置。
 
-在 AI Studio 中查看你的应用：[点击这里](https://ai.studio/apps/drive/173Pkz_uXR3Ej-UA4oZGaddzgSFy_0WW1)
 
 [English](./README.md) | [简体中文](./README_zh-CN.md)
 
