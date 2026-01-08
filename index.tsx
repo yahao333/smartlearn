@@ -1,71 +1,18 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { createRoot } from "react-dom/client";
 import { GoogleGenAI, Type } from "@google/genai";
-import ReactMarkdown from 'react-markdown';
-
-// --- 类型定义 ---
-
-interface CourseModule {
-  id: string;
-  title: string;
-  description: string;
-  duration: string;
-  keyPoints: string[];
-}
-
-interface CoursePlan {
-  topic: string;
-  level: string;
-  totalDuration: string;
-  overview: string;
-  modules: CourseModule[];
-}
-
-interface QuizQuestion {
-  question: string;
-  options: string[];
-  correctIndex: number;
-  explanation: string;
-}
-
-interface QuizData {
-  moduleId: string;
-  questions: QuizQuestion[];
-}
-
-interface Message {
-  role: 'user' | 'model';
-  text: string;
-}
-
-interface ResourceLink {
-  title: string;
-  uri: string;
-  source?: string;
-}
-
-interface UserGoal {
-  topic: string;
-  level: string;
-  time: string;
-}
-
-// 设置相关的类型
-type AIProvider = 'gemini' | 'alibaba';
-
-interface AppSettings {
-  provider: AIProvider;
-  alibabaApiKey: string;
-}
-
-// --- AI 服务接口 ---
-
-interface IAIService {
-  generateCoursePlan(goal: UserGoal): Promise<CoursePlan>;
-  generateModuleContent(topic: string, module: CourseModule): Promise<{ content: string; resources: ResourceLink[] }>;
-  generateQuiz(module: CourseModule): Promise<QuizData>;
-  chat(messages: Message[], context: { topic: string; module: string }): Promise<string>;
-}
+import { MarkdownRenderer } from "./components/MarkdownRenderer";
+import { useModuleContent } from "./hooks/useModuleContent";
+import type {
+  AppSettings,
+  CourseModule,
+  CoursePlan,
+  IAIService,
+  Message,
+  QuizData,
+  ResourceLink,
+  UserGoal,
+} from "./lib/types";
 
 // --- Gemini 实现 ---
 
@@ -391,11 +338,22 @@ const App = () => {
   const [coursePlan, setCoursePlan] = useState<CoursePlan | null>(null);
   const [currentModuleIndex, setCurrentModuleIndex] = useState(0);
   const [moduleScores, setModuleScores] = useState<Record<number, number>>({});
-  const [moduleContent, setModuleContent] = useState<string>('');
-  const [moduleResources, setModuleResources] = useState<ResourceLink[]>([]);
   const [quizData, setQuizData] = useState<QuizData | null>(null);
   const [moduleContentsCache, setModuleContentsCache] = useState<Record<number, { content: string; resources: ResourceLink[] }>>({});
   const [quizCache, setQuizCache] = useState<Record<number, QuizData>>({});
+
+  const {
+    content: moduleContent,
+    resources: moduleResources,
+    loadModuleContent,
+    setContent: setModuleContent,
+    setResources: setModuleResources,
+  } = useModuleContent({
+    aiService,
+    coursePlan,
+    moduleContentsCache,
+    setModuleContentsCache,
+  });
   
   // --- 持久化逻辑 ---
 
@@ -492,8 +450,7 @@ const App = () => {
     const cached = moduleContentsCache[index];
     if (cached) {
       console.log("命中缓存的模块内容，直接进入学习视图");
-      setModuleContent(cached.content);
-      setModuleResources(cached.resources);
+      await loadModuleContent(index);
       setView('learning');
       return;
     }
@@ -504,10 +461,7 @@ const App = () => {
     setModuleResources([]);
 
     try {
-      const result = await aiService.generateModuleContent(coursePlan!.topic, module);
-      setModuleContent(result.content);
-      setModuleResources(result.resources);
-      setModuleContentsCache(prev => ({ ...prev, [index]: { content: result.content, resources: result.resources } }));
+      await loadModuleContent(index);
       setView('learning');
     } catch (error: any) {
       console.error("加载内容失败:", error);
@@ -838,7 +792,7 @@ const LearningView = ({ module, content, resources, onBack, onTakeQuiz, topic, a
           </div>
           
           <div className="prose prose-blue max-w-none">
-            <ReactMarkdown>{content}</ReactMarkdown>
+            <MarkdownRenderer markdown={content} />
           </div>
 
           <div className="mt-12 pt-8 border-t border-gray-100">
