@@ -4,6 +4,14 @@
 
 This contains everything you need to run your app locally.
 
+## Features
+
+- **Personalized Learning Paths**: AI custom-tailors a curriculum based on your goals, level, and time availability.
+- **Intelligent Content Generation**: Real-time generation of high-quality learning materials in Markdown format.
+- **AI Tutor Companion**: Built-in chat assistant to answer questions and provide guidance throughout your learning journey.
+- **Automated Quizzes & Assessment**: Auto-generated quizzes after each module to reinforce knowledge and track performance.
+- **Multi-Model Support**: Powered by Google Gemini and Alibaba Cloud Qwen, offering flexibility in AI providers.
+- **Progress Tracking**: Automatically saves your learning progress and quiz scores.
 
 ## Run Locally
 
