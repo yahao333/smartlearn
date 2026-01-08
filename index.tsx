@@ -394,6 +394,8 @@ const App = () => {
   const [moduleContent, setModuleContent] = useState<string>('');
   const [moduleResources, setModuleResources] = useState<ResourceLink[]>([]);
   const [quizData, setQuizData] = useState<QuizData | null>(null);
+  const [moduleContentsCache, setModuleContentsCache] = useState<Record<number, { content: string; resources: ResourceLink[] }>>({});
+  const [quizCache, setQuizCache] = useState<Record<number, QuizData>>({});
   
   // --- 持久化逻辑 ---
 
@@ -407,6 +409,8 @@ const App = () => {
           setCoursePlan(parsed.coursePlan);
           setCurrentModuleIndex(parsed.currentModuleIndex || 0);
           setModuleScores(parsed.moduleScores || {});
+          setModuleContentsCache(parsed.moduleContentsCache || {});
+          setQuizCache(parsed.quizCache || {});
           setView('dashboard');
         }
       } catch (e) { console.error("加载进度失败", e); }
@@ -423,9 +427,18 @@ const App = () => {
 
   useEffect(() => {
     if (coursePlan) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ coursePlan, currentModuleIndex, moduleScores }));
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({
+          coursePlan,
+          currentModuleIndex,
+          moduleScores,
+          moduleContentsCache,
+          quizCache
+        })
+      );
     }
-  }, [coursePlan, currentModuleIndex, moduleScores]);
+  }, [coursePlan, currentModuleIndex, moduleScores, moduleContentsCache, quizCache]);
 
   useEffect(() => {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
@@ -438,6 +451,8 @@ const App = () => {
       localStorage.removeItem(STORAGE_KEY);
       setCoursePlan(null);
       setModuleScores({});
+      setModuleContentsCache({});
+      setQuizCache({});
       setCurrentModuleIndex(0);
       setView('onboarding');
     }
@@ -445,6 +460,11 @@ const App = () => {
 
   const handleGenerateCourse = async () => {
     if (!userGoal.topic) return;
+    if (coursePlan) {
+      console.log("已存在课程计划，跳转到概览而不重新生成");
+      setView('dashboard');
+      return;
+    }
     setLoading(true);
     setLoadingText('正在规划学习路径...');
 
@@ -469,6 +489,15 @@ const App = () => {
     const module = coursePlan?.modules[index];
     if (!module) return;
 
+    const cached = moduleContentsCache[index];
+    if (cached) {
+      console.log("命中缓存的模块内容，直接进入学习视图");
+      setModuleContent(cached.content);
+      setModuleResources(cached.resources);
+      setView('learning');
+      return;
+    }
+
     setLoading(true);
     setLoadingText(`正在准备“${module.title}”的学习资料...`);
     setModuleContent('');
@@ -478,6 +507,7 @@ const App = () => {
       const result = await aiService.generateModuleContent(coursePlan!.topic, module);
       setModuleContent(result.content);
       setModuleResources(result.resources);
+      setModuleContentsCache(prev => ({ ...prev, [index]: { content: result.content, resources: result.resources } }));
       setView('learning');
     } catch (error: any) {
       console.error("加载内容失败:", error);
@@ -491,12 +521,21 @@ const App = () => {
     const module = coursePlan?.modules[currentModuleIndex];
     if (!module) return;
 
+    const cachedQuiz = quizCache[currentModuleIndex];
+    if (cachedQuiz) {
+      console.log("命中缓存的测验数据，直接进入测验视图");
+      setQuizData(cachedQuiz);
+      setView('quiz');
+      return;
+    }
+
     setLoading(true);
     setLoadingText('正在生成测验...');
 
     try {
       const data = await aiService.generateQuiz(module);
       setQuizData(data);
+      setQuizCache(prev => ({ ...prev, [currentModuleIndex]: data }));
       setView('quiz');
     } catch (error) {
       console.error("生成测验失败:", error);
